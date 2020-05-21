@@ -225,7 +225,7 @@ func (cm *ConsensusModule) electionTimeout() time.Duration {
 //
 // This function is blocking and should be launched in a separate goroutine;
 // it's designed to work for a single (one-shot) election timer, as it exits
-// whenever the CM state changes from follower/candidate or the term changes.
+// whenever the CM state changes from follower/candidate
 func (cm *ConsensusModule) runElectionTimer() {
 	timeoutDuration := cm.electionTimeout()
 	cm.mu.Lock()
@@ -244,24 +244,23 @@ func (cm *ConsensusModule) runElectionTimer() {
 		<-ticker.C
 
 		cm.mu.Lock()
-		if cm.state != Candidate && cm.state != Follower {
+		if cm.state == Leader || cm.state == Dead {
 			cm.dlog("in election timer state=%s, bailing out", cm.state)
+			isDead := cm.state == Dead
 			cm.mu.Unlock()
-			return
-		}
-
-		if termStarted != cm.currentTerm {
-			cm.dlog("in election timer term changed from %d to %d, bailing out", termStarted, cm.currentTerm)
-			cm.mu.Unlock()
-			return
-		}
+			if isDead {
+				return
+			}
+			continue
+		} 
 
 		// Start an election if we haven't heard from a leader or haven't voted for
 		// someone for the duration of the timeout.
 		if elapsed := time.Since(cm.electionResetEvent); elapsed >= timeoutDuration {
 			cm.startElection()
 			cm.mu.Unlock()
-			return
+			continue
+			//return
 		}
 		cm.mu.Unlock()
 	}
@@ -317,9 +316,6 @@ func (cm *ConsensusModule) startElection() {
 			}
 		}(peerId)
 	}
-
-	// Run another election timer, in case this election is not successful.
-	go cm.runElectionTimer()
 }
 
 // becomeFollower makes cm a follower and resets its state.
@@ -330,8 +326,6 @@ func (cm *ConsensusModule) becomeFollower(term int) {
 	cm.currentTerm = term
 	cm.votedFor = -1
 	cm.electionResetEvent = time.Now()
-
-	go cm.runElectionTimer()
 }
 
 // startLeader switches cm into a leader state and begins process of heartbeats.
