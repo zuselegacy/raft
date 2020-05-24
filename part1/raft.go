@@ -153,7 +153,7 @@ func (cm *ConsensusModule) RequestVote(args RequestVoteArgs, reply *RequestVoteR
 	}
 
 	if cm.currentTerm == args.Term &&
-		(cm.votedFor == -1 || cm.votedFor == args.CandidateId) {
+		(cm.votedFor == -1 ) {
 		reply.VoteGranted = true
 		cm.votedFor = args.CandidateId
 		cm.electionResetEvent = time.Now()
@@ -245,7 +245,6 @@ func (cm *ConsensusModule) runElectionTimer() {
 
 		cm.mu.Lock()
 		if cm.state == Leader || cm.state == Dead {
-			cm.dlog("in election timer state=%s, bailing out", cm.state)
 			isDead := cm.state == Dead
 			cm.mu.Unlock()
 			if isDead {
